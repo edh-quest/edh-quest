@@ -1,0 +1,79 @@
+# =====================================================================
+# EDH Quest — root .htaccess
+# Apache directives for IONOS shared hosting (Apache 2.4 + 2.2 compat).
+# =====================================================================
+
+# ── HTTPS-only redirect ────────────────────────────────────────────────
+# Force every request to https://. The X-Forwarded-Proto check is for
+# IONOS setups where SSL terminates at a load balancer in front of Apache.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# ── Security response headers ──────────────────────────────────────────
+<IfModule mod_headers.c>
+    # Tell browsers to use HTTPS for the next 6 months and include subdomains.
+    Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
+
+    # Prevent clickjacking — disallow framing entirely.
+    Header always set X-Frame-Options "DENY"
+
+    # Block MIME-type sniffing.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Don't leak full URLs to other origins.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Disable powerful browser features we don't use.
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+    # Content-Security-Policy. All JS, CSS, fonts and images are self-hosted;
+    # the only outbound traffic is user-clicked links to scryfall.com, which
+    # navigate away and don't need a CSP allowance. 'unsafe-inline' on
+    # script-src/style-src is required while inline onclick= and style=
+    # attributes remain in templates — tighten once those are removed.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+</IfModule>
+
+# ── Static-asset caching ───────────────────────────────────────────────
+# Long cache for css/js/images/fonts — index.php cache-busts these via
+# ?v=<filemtime> so a long max-age is safe.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css                "access plus 1 year"
+    ExpiresByType application/javascript  "access plus 1 year"
+    ExpiresByType image/png               "access plus 1 year"
+    ExpiresByType image/jpeg              "access plus 1 year"
+    ExpiresByType image/svg+xml           "access plus 1 year"
+    ExpiresByType image/webp              "access plus 1 year"
+    ExpiresByType image/x-icon            "access plus 1 year"
+    ExpiresByType font/woff               "access plus 1 year"
+    ExpiresByType font/woff2              "access plus 1 year"
+    ExpiresByType application/font-woff2  "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Belt-and-braces: explicit Cache-Control for static asset extensions.
+    <FilesMatch "\.(css|js|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # HTML / PHP / JSON: don't cache so deploys are visible immediately.
+    <FilesMatch "\.(html|php|json)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# ── Block hidden / version-control files ───────────────────────────────
+<FilesMatch "^\.(git|gitignore|gitattributes|env|htaccess|htpasswd)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

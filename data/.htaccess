@@ -1,0 +1,11 @@
+# Block all direct HTTP access to data/ and its subdirectories.
+# Only PHP code (api/*.php) may read or write these files.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -1,0 +1,27 @@
+# Windows shortcuts (local only)
+*.lnk
+
+# Local launcher scripts — maintainer-specific, not for the public repo
+start.ps1
+start.bat
+
+# Claude Code local data
+.claude/
+
+# Lobby data (server-side JSON files, auto-created at runtime)
+data/lobbies/*.json
+data/quest-results/*.json
+
+# Rate-limit log (hashed IPs + timestamps, auto-created at runtime).
+# Recreated automatically by fopen('c+') on the next API request.
+data/rate_limits.json
+
+# Server-side secret for hashing IPs in the rate limiter (auto-generated
+# per deployment on first request). Never commit — each install needs its own.
+data/rate_limit_secret
+
+# Legal pages contain the maintainer's real name and address. Kept out of
+# git so the public repo doesn't leak personal data. Contributors: copy
+# the *.example.php files and fill in your own details before deploying.
+legal/impressum.php
+legal/datenschutz.php

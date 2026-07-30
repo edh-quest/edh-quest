@@ -1,0 +1,13 @@
+# Block all direct HTTP access to scripts/.
+# These are CLI-only maintenance tools (CSV updaters, etc.) and must
+# never be reachable via the web — running them over HTTP would hammer
+# external APIs and modify on-disk data files.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -1,0 +1,42 @@
+UPDATE QUANTITIES - HOW TO RUN
+==============================
+
+This script fetches the number of valid commanders for each criteria
+from the Scryfall API and writes the results into two files:
+
+  - assets/files/criteria/burden_scryfall.csv
+  - assets/files/criteria/lore_scryfall.csv
+
+Two columns are written to each file:
+
+  - quantity   : total commanders matching the criteria
+  - percentile : how rare this criteria is (0 = most commanders, 100 = fewest)
+
+Rows with N/A as scryfall_text are skipped and get "N/A" for both columns.
+Re-running the script will overwrite both columns with fresh data.
+
+
+HOW TO RUN
+----------
+
+1. Open Git Bash
+2. Navigate to the project root:
+
+     cd /c/Projects/mtg-quest
+
+3. Run the combined script (burden + lore):
+
+     powershell -ExecutionPolicy Bypass -File scripts/update_quantities.ps1
+
+4. Wait for all criteria to be fetched (~1 second per row with a query).
+   Progress is printed live in the terminal.
+
+   To run burden only (legacy script):
+     powershell -ExecutionPolicy Bypass -File scripts/update_burden_quantities.ps1
+
+
+WHEN TO RE-RUN
+--------------
+
+- After adding new rows to either CSV
+- If you suspect Scryfall card counts have changed significantly
