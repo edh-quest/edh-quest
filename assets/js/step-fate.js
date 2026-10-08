@@ -308,45 +308,42 @@ const FateSystem = {
     // Scroll to the curse section
     setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
 
-    // Draw 3 new burden cards, excluding already-seen ones. No rerolls on curse picks.
+    // Draw 3 new burden cards, excluding already-seen ones.
     CardState.flippedCount = 0;
     CardState.totalCards   = 3;
 
-    const pool = CRITERIA.commanderStats;
+    const firstBurden = QuestState.commanderStat;
+
+    // Build a combined Scryfall link so it filters by both burdens at once
+    const withCombinedLink = (crit) => {
+      if (!firstBurden?.scryfall_text || !crit.scryfall_text ||
+          firstBurden.scryfall_text === 'N/A' || crit.scryfall_text === 'N/A') return crit;
+      const combined = [
+        _SCRYFALL_BASE,
+        _stripScryfallBase(firstBurden.scryfall_text),
+        _stripScryfallBase(crit.scryfall_text),
+      ].filter(Boolean).join(' ');
+      return { ...crit, scryfall_link: `https://scryfall.com/search?q=${encodeURIComponent(combined)}` };
+    };
+
+    // Only burdens that can coexist with the picked one — used for both the
+    // initial draw and rerolls, so a reroll can never produce a contradiction.
+    const pool = CRITERIA.commanderStats
+      .filter(c => !firstBurden || _burdensCompatible(firstBurden, c))
+      .map(withCombinedLink);
 
     // Exclude both RerollState-tracked cards AND the 3 currently displayed originals.
-    // Also exclude the picked burden's category — burden plausibility: the curse
-    // shouldn't add a second burden that constrains the same axis as the first.
     const drawnTitles = new Set(
       [...document.querySelectorAll('#drawn-cards-row .flip-card')]
         .map(el => el._crit?.title).filter(Boolean)
     );
-    const pickedCategory = QuestState.commanderStat?.category || '';
-    let available = pool.filter(c =>
-      !RerollState.usedTitles.has(c.title) && !drawnTitles.has(c.title) &&
-      (!pickedCategory || c.category !== pickedCategory)
-    );
-    if (available.length < 3) {
-      available = pool.filter(c => !RerollState.usedTitles.has(c.title) && !drawnTitles.has(c.title));
-    }
+    const available = pool.filter(c => !RerollState.usedTitles.has(c.title) && !drawnTitles.has(c.title));
     const choices   = pickWithCategoryLimit(available, 3, 1);
     RerollState.markUsed(choices);
 
-    const row         = section.querySelector('#curse-cards-row');
-    const firstBurden = QuestState.commanderStat;
+    const row = section.querySelector('#curse-cards-row');
     choices.forEach((crit, i) => {
-      // Build a combined Scryfall link so it filters by both burdens at once
-      let displayCrit = crit;
-      if (firstBurden?.scryfall_text && crit.scryfall_text &&
-          firstBurden.scryfall_text !== 'N/A' && crit.scryfall_text !== 'N/A') {
-        const combined = [
-          _SCRYFALL_BASE,
-          _stripScryfallBase(firstBurden.scryfall_text),
-          _stripScryfallBase(crit.scryfall_text),
-        ].filter(Boolean).join(' ');
-        displayCrit = { ...crit, scryfall_link: `https://scryfall.com/search?q=${encodeURIComponent(combined)}` };
-      }
-      row.appendChild(buildQuestFlipCard(displayCrit, i, {
+      row.appendChild(buildQuestFlipCard(crit, i, {
         backClass:    'flip-card-back',
         pool:         pool,
         onAllFlipped: () => enableCardSelection('#curse-cards-row'),
@@ -362,3 +359,46 @@ const FateSystem = {
       .addEventListener('click', () => QuestFlow.advance());
   },
 };
+
+/* ── Burden compatibility ───────────────────────────────────── */
+
+const _MV_MAX = 20;
+
+/**
+ * Set of commander mana values a burden allows, parsed from its Scryfall
+ * query (e.g. "mv=4", "mv>=5", "(mv=1 or mv>=8)"). Returns null when the
+ * burden doesn't constrain mana value.
+ */
+function _burdenManaValues(crit) {
+  const text  = crit?.scryfall_text || '';
+  const terms = [...text.matchAll(/(?:^|[^-\w])mv\s*(<=|>=|=|:|<|>)\s*(\d+)/g)];
+  if (!terms.length) return null;
+
+  const allows = (mv, op, n) =>
+    op === '<=' ? mv <= n : op === '>=' ? mv >= n :
+    op === '<'  ? mv <  n : op === '>'  ? mv >  n : mv === n;
+  const isOr = /\bor\b/i.test(text);
+
+  const set = new Set();
+  for (let mv = 0; mv <= _MV_MAX; mv++) {
+    const hits = terms.map(([, op, n]) => allows(mv, op, parseInt(n, 10)));
+    if (isOr ? hits.some(Boolean) : hits.every(Boolean)) set.add(mv);
+  }
+  return set;
+}
+
+/**
+ * Whether two burdens can both apply to the same commander. Burdens of the
+ * same category constrain the same axis and never combine; mana value
+ * constraints are also checked across categories (e.g. "exactly 4" vs "odd").
+ */
+function _burdensCompatible(a, b) {
+  if (a.title === b.title) return false;
+  if (a.category && a.category === b.category) return false;
+
+  const mvA = _burdenManaValues(a);
+  const mvB = _burdenManaValues(b);
+  if (mvA && mvB && ![...mvA].some(mv => mvB.has(mv))) return false;
+
+  return true;
+}
