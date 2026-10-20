@@ -48,6 +48,9 @@ const QuestState = {
     this.greedCount       = 0;
     this.greedPenalty     = 0;
     this.pendingLoreBonus = 0;
+    // Step 4 keeps drawn crossings for resume; clear them or the next quest
+    // treats the previous quest's crossings as a restored save.
+    EventState.reset();
   },
 };
 
@@ -92,6 +95,15 @@ const EventState = {
   // and the index (0..cardsPerCrossing-1) the player picked at each crossing.
   crossingBatches:  [],       // e.g. [ [ev,ev,ev], [ev,ev,ev], null, null ]
   chosenIdx:        [],       // e.g. [ 0, 2, null, null ]
+
+  reset() {
+    this.picks           = [];
+    this.chosen          = [];
+    this.flippedCounts   = [];
+    this.pendingBonus    = [];
+    this.crossingBatches = [];
+    this.chosenIdx       = [];
+  },
 };
 
 /* =============================================================
